@@ -995,18 +995,29 @@ function renderGrupos(){
       <div class="grupo-row">
         <input type="number" min="1" inputmode="numeric" placeholder="0" value="${g.cantPallets}" oninput="updateGrupo(${i},'cantPallets',this.value)">
         <input type="number" min="0" inputmode="numeric" placeholder="0" value="${g.botPallet}" oninput="updateGrupo(${i},'botPallet',this.value)">
-        <span class="grupo-subtotal">${Number(g.cantPallets||0)*Number(g.botPallet||0)||'-'}</span>
+        <span class="grupo-subtotal" id="gsub-${i}">${Number(g.cantPallets||0)*Number(g.botPallet||0)||'-'}</span>
         <button class="grupo-del" onclick="removeGrupo(${i})" ${_grupos.length===1?'disabled':''}>×</button>
       </div>
     `).join('')}
     <button class="btn-add-grupo" onclick="addGrupo()">+ Agregar grupo de pallets</button>
-    <div class="grupos-total"><span>Total:</span><span>${totalP} pallets · <span style="color:var(--ok)">${totalB} botellas</span></span></div>
+    <div class="grupos-total" id="grupos-total"><span>Total:</span><span>${totalP} pallets · <span style="color:var(--ok)">${totalB} botellas</span></span></div>
   `;
 }
 
 function updateGrupo(i,field,val){
   _grupos[i][field]=val;
-  renderGrupos();
+  // Solo actualizamos los números calculados, sin re-renderizar los inputs
+  const sub=document.getElementById('gsub-'+i);
+  if(sub){
+    const s=Number(_grupos[i].cantPallets||0)*Number(_grupos[i].botPallet||0);
+    sub.textContent=s||'-';
+  }
+  const totalEl=document.getElementById('grupos-total');
+  if(totalEl){
+    const totalP=_grupos.reduce((a,g)=>a+Number(g.cantPallets||0),0);
+    const totalB=_grupos.reduce((a,g)=>a+Number(g.cantPallets||0)*Number(g.botPallet||0),0);
+    totalEl.innerHTML=`<span>Total:</span><span>${totalP} pallets · <span style="color:var(--ok)">${totalB} botellas</span></span>`;
+  }
 }
 function addGrupo(){_grupos.push({cantPallets:'',botPallet:''});renderGrupos();}
 function removeGrupo(i){if(_grupos.length>1){_grupos.splice(i,1);renderGrupos();}}
@@ -1033,13 +1044,13 @@ function doIngreso(cod,tipo,isFijo,label){
     loteId:'L'+(loteSeq++),
     bodega:document.getElementById('mb').value.trim(),
     cantPallets,botPallet,totalBotellas,
-    grupos:grupos.length>1?grupos:undefined,
     decorado:document.getElementById('md').value.trim(),
     op:document.getElementById('mop').value.trim(),
     usuario:document.getElementById('muser').value.trim(),
     obs:document.getElementById('mob').value.trim(),
     fecha:fechaDisplay(fechaIso),hora:horaIso,fechaISO:fechaIso,horaISO:horaIso
   };
+  if(grupos.length>1) entry.grupos=grupos;
   if(!pallets[cod])pallets[cod]=[];
   pallets[cod].push(entry);
   log.unshift({tipo:'ingreso',celda:label,...entry});
@@ -1093,16 +1104,18 @@ function doEditSave(cod,idx,isFijo,label,tipo){
   const botPallet=grupos.length===1?grupos[0].botPallet:0;
   const fechaIso=document.getElementById('mfecha').value||isoDateNow();
   const horaIso=document.getElementById('mhora').value||isoTimeNow();
-  Object.assign(lote,{
+  const cambios={
     bodega:document.getElementById('mb').value.trim(),
     cantPallets,botPallet,totalBotellas,
-    grupos:grupos.length>1?grupos:undefined,
     decorado:document.getElementById('md').value.trim(),
     op:document.getElementById('mop').value.trim(),
     usuario:document.getElementById('muser').value.trim(),
     obs:document.getElementById('mob').value.trim(),
     fecha:fechaDisplay(fechaIso),hora:horaIso,fechaISO:fechaIso,horaISO:horaIso
-  });
+  };
+  if(grupos.length>1) cambios.grupos=grupos;
+  else delete lote.grupos;
+  Object.assign(lote,cambios);
   renderDep();renderDep2();renderStats();renderStatsG2();scheduleSave();
   renderListaModal(cod,tipo,isFijo,label);
 }
