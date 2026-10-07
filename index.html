@@ -477,10 +477,11 @@ button,input,select,textarea{font-family:inherit}
   <div class="galpon-tabs">
     <button class="galpon-tab active" id="gtab-g1" onclick="showGalpon('g1')">GALPÓN 1</button>
     <button class="galpon-tab" id="gtab-g2" onclick="showGalpon('g2')">GALPÓN 2</button>
+    <!-- g1 = panel-galpon2 (PROCESAR/TRÁNSITO) | g2 = panel-plano (DECORAR/TERMINADO) -->
   </div>
 
   <div class="content">
-    <div id="panel-plano" class="panel active">
+    <div id="panel-plano" class="panel">
       <div class="stats" id="stats"></div>
       <div class="dep-wrap" id="dep"></div>
       <div class="legend">
@@ -490,7 +491,7 @@ button,input,select,textarea{font-family:inherit}
       </div>
     </div>
 
-    <div id="panel-galpon2" class="panel">
+    <div id="panel-galpon2" class="panel active">
       <div class="stats" id="stats-g2"></div>
       <div class="dep-wrap-g2" id="dep-g2"></div>
       <div class="legend">
@@ -643,6 +644,7 @@ const FIJOS_DER=[
 /* --- Galpón 2 --- */
 const BLOQUE_PROCESAR={label:'MERCADERÍA A PROCESAR',tipo:'procesar',celdas:['1A','2A','3A','4A','5A']};
 const BLOQUE_TRANSITO={label:'MERCADERÍA EN TRÁNSITO',tipo:'transito',celdas:['1B','2B','3B']};
+const CELDAS_FIJAS_G2={'1B':'MAQUINARIA WENTEK'}; // celdas no editables con etiqueta fija
 
 function getLotes(id){return pallets[id]||[]}
 
@@ -879,25 +881,38 @@ function makeBloqueG2V(b){
   const cells=document.createElement('div');
   cells.className='bloque-g2-cells-v';
   b.celdas.forEach(cod=>{
+    const esFija=CELDAS_FIJAS_G2.hasOwnProperty(cod);
     const lotes=getLotes(cod);
     const celda=document.createElement('div');
-    celda.className='celda '+(lotes.length?'ocupada':'libre');
     celda.style.borderBottom='1px solid var(--border)';
     celda.setAttribute('data-id',cod);
-    celda.onclick=()=>openModal(cod,b.tipo);
-    const etiq=document.createElement('div');
-    etiq.className='etiq';etiq.textContent=cod;
-    const inner=document.createElement('div');
-    inner.className='celda-inner';
-    if(lotes.length){
-      const totalP=lotes.reduce((a,l)=>a+Number(l.cantPallets||0),0);
-      const totalB=lotes.reduce((a,l)=>a+Number(l.totalBotellas||0),0);
-      const primero=lotes[0];
-      inner.innerHTML=`<span class="dat">${primero.decorado||primero.bodega||'Sin nombre'}${lotes.length>1?' +'+(lotes.length-1):''}</span><span class="sub">${totalB} bot.</span><span class="pals">${totalP}p</span>`;
+    if(esFija){
+      // Celda fija: gris, no clickeable
+      celda.className='celda';
+      celda.style.background='var(--surface-2)';
+      const etiq=document.createElement('div');
+      etiq.className='etiq';etiq.textContent=cod;
+      const inner=document.createElement('div');
+      inner.className='celda-inner';
+      inner.innerHTML=`<span class="dat" style="color:var(--text-dim);font-style:normal;font-weight:600;font-size:10px;text-align:center;white-space:normal;line-height:1.3">${CELDAS_FIJAS_G2[cod]}</span>`;
+      celda.appendChild(etiq);celda.appendChild(inner);
     } else {
-      inner.innerHTML=`<span class="dat">Libre</span>`;
+      celda.className='celda '+(lotes.length?'ocupada':'libre');
+      celda.onclick=()=>openModal(cod,b.tipo);
+      const etiq=document.createElement('div');
+      etiq.className='etiq';etiq.textContent=cod;
+      const inner=document.createElement('div');
+      inner.className='celda-inner';
+      if(lotes.length){
+        const totalP=lotes.reduce((a,l)=>a+Number(l.cantPallets||0),0);
+        const totalB=lotes.reduce((a,l)=>a+Number(l.totalBotellas||0),0);
+        const primero=lotes[0];
+        inner.innerHTML=`<span class="dat">${primero.decorado||primero.bodega||'Sin nombre'}${lotes.length>1?' +'+(lotes.length-1):''}</span><span class="sub">${totalB} bot.</span><span class="pals">${totalP}p</span>`;
+      } else {
+        inner.innerHTML=`<span class="dat">Libre</span>`;
+      }
+      celda.appendChild(etiq);celda.appendChild(inner);
     }
-    celda.appendChild(etiq);celda.appendChild(inner);
     cells.appendChild(celda);
   });
   const lbl=document.createElement('div');
@@ -1307,6 +1322,10 @@ function exportCSV(){
 /* ================= TABS ================= */
 let currentGalpon='g1';
 
+// g1 → panel-galpon2 (PROCESAR/TRÁNSITO) = GALPÓN 1
+// g2 → panel-plano   (DECORAR/TERMINADO) = GALPÓN 2
+function _panelForGalpon(g){ return g==='g1'?'panel-galpon2':'panel-plano'; }
+
 function showGalpon(g){
   currentGalpon=g;
   document.querySelectorAll('.galpon-tab').forEach(b=>b.classList.remove('active'));
@@ -1315,12 +1334,10 @@ function showGalpon(g){
   const pagina=g==='g1'?'Página 1 de 2':'Página 2 de 2';
   document.getElementById('wh-galpon-label').textContent=label;
   document.getElementById('wh-pagina').textContent=pagina;
-  // Si estamos en el panel plano, cambiar qué panel se muestra
   const activoPanel=document.querySelector('.panel.active');
   if(activoPanel&&(activoPanel.id==='panel-plano'||activoPanel.id==='panel-galpon2')){
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    document.getElementById(g==='g1'?'panel-plano':'panel-galpon2').classList.add('active');
-    // Actualizar tab activo del tabbar también
+    document.getElementById(_panelForGalpon(g)).classList.add('active');
     document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
     document.getElementById('tabbtn-plano').classList.add('active');
   }
@@ -1331,7 +1348,7 @@ function showTab(t){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tabbtn-'+t).classList.add('active');
   if(t==='plano'){
-    document.getElementById(currentGalpon==='g1'?'panel-plano':'panel-galpon2').classList.add('active');
+    document.getElementById(_panelForGalpon(currentGalpon)).classList.add('active');
   } else {
     document.getElementById('panel-'+t).classList.add('active');
   }
